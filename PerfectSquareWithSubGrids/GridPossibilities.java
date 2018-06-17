@@ -11,12 +11,16 @@ public class GridPossibilities {
 	private Set<Byte[]> nDigitRowPossibilities;
 	private Set<Byte[][]> gridPossibilities;
 	
+	private Set<Byte> domain = new HashSet<Byte>();
+	
 	private static Map<Byte, Set<Byte[][]>> possibilitiesOfRowsCombined = new HashMap<Byte, Set<Byte[][]>>();
 	
 	public GridPossibilities(byte n, Set<Byte[]> nDigitRowPossibilities) {
 		this.n = n;
 		this.nDigitRowPossibilities = nDigitRowPossibilities;
-		gridPossibilities = new HashSet<Byte[][]>();
+		this.gridPossibilities = new HashSet<Byte[][]>();
+		for (byte number = 1; number <= n; number++)
+			domain.add(number);
 	}
 	
 	public Set<Byte[][]> getGridPossibilities() {
@@ -36,17 +40,17 @@ public class GridPossibilities {
 		System.out.println("When chosing 1 unique row at a time from " + nDigitRowPossibilities.size() + " possible rows, for making a valid grid of 1 row, there are " + possibilitiesOfRowsCombined.get((byte) 1).size() + " possibilities");
 		for (byte i = 2; i <= x; i++) {
 			getAllForIRow(i);
-			//System.out.println("When chosing " + i + " unique rows at a time from " + nDigitRowPossibilities.size() + " possible rows, for making a valid grid of " + i + " rows, there are " + possibilitiesOfRowsCombined.get((byte) i).size() + " possibilities");
+			System.out.println("When chosing " + i + " unique rows at a time from " + nDigitRowPossibilities.size() + " possible rows, for making a valid grid with sub-grids of " + i + " rows, there are " + possibilitiesOfRowsCombined.get((byte) i).size() + " possibilities");
 			
 			/*
 			if (i % Math.sqrt(n) == 0.0)
 				performSmallerGridCheck(i);
 			System.out.println("-> After " + "When chosing " + i + " unique rows at a time from " + nDigitRowPossibilities.size() + " possible rows, for making a valid grid of " + i + " rows, there are " + possibilitiesOfRowsCombined.get((byte) i).size() + " possibilities");
 			*/
-			
+			/*
 			performSmallerGridCheckTillNow(i);
 			System.out.println("When chosing " + i + " unique rows at a time from " + nDigitRowPossibilities.size() + " possible rows, for making a valid grid with sub-grids of " + i + " rows, there are " + possibilitiesOfRowsCombined.get((byte) i).size() + " possibilities");
-			
+			*/
 		}
 	}
 
@@ -57,22 +61,29 @@ public class GridPossibilities {
 		Set<Byte[][]> setOfIRow = new HashSet<Byte[][]>();
 		for (Byte[][] possibilityOfIMinus1 : setOfIMinus1Row) {
 			for (Byte[][] rowPossibilityOf1 : possibilitiesOfRowsCombined.get((byte) 1)) {
-				boolean repeatingRow = false;
+				boolean repeating = false;
 				Byte[] rowOf1 = rowPossibilityOf1[0];
+				Byte[][] generatedPossibility = null;
 				for (Byte[] rowOfPossibilityOfIMinus1 : possibilityOfIMinus1) {
-					if (anyDigitMatchesInBothRows(rowOf1, rowOfPossibilityOfIMinus1)) {
-						repeatingRow = true;
+					generatedPossibility = addNewRowByAppending(rowOf1, possibilityOfIMinus1);
+					if (anyDigitMatchesInBothRows(rowOf1, rowOfPossibilityOfIMinus1)
+							|| anyDigitMatchesInSubGrids(generatedPossibility, i)) {
+						repeating = true;
 						break;
 					}
 				}
-				if (repeatingRow) {
+				if (repeating) {
 					continue;
 				} else {
-					setOfIRow.add(addNewRowByAppending(rowOf1, possibilityOfIMinus1));
+					setOfIRow.add(generatedPossibility);
 				}
 			}
 		}
 		possibilitiesOfRowsCombined.put((byte) i, setOfIRow);
+	}
+	
+	private boolean anyDigitMatchesInSubGrids(Byte[][] generatedPossibility, byte i) {
+		return invalidGrid(generatedPossibility, i);
 	}
 
 	private boolean anyDigitMatchesInBothRows(Byte[] rowOf1, Byte[] rowOfPossibilityOfIMinus1) {
@@ -160,6 +171,59 @@ public class GridPossibilities {
 		
 	}
 	
+	private boolean invalidGrid(Byte[][] generatedPossibility, byte i) {
+		//printIt(gridPossibility);
+		
+		byte temp = 0;
+		while (temp < i)
+			temp = (byte) (temp + (byte) Math.sqrt(n));
+		byte fromGridRow = (byte) (temp - (byte) Math.sqrt(n));
+		byte tillGridRow = (byte) (i - 1);
+		
+		boolean hasMoreCols = true;
+		byte fromCol = 0;
+		byte tillCol = (byte) (Math.sqrt(n) - 1);
+		
+		boolean disrupted = false;
+		
+		while (hasMoreCols) {
+			
+			Set<Byte> domain = getMutableDomain();
+			
+			disrupted = false;
+			
+			for (byte row = fromGridRow; row <= tillGridRow; row++) {
+				for (byte col = fromCol; col <= tillCol; col++) {
+					Byte value = generatedPossibility[row][col];
+					if (domain.contains(value)) {
+						domain.remove(value);
+					} else {
+						//System.out.println("-> row " + row + " col " + col);
+						//printIt(gridPossibility);
+						disrupted = true;
+						break;
+					}
+				}
+				if (disrupted)
+					break;
+			}
+			
+			if (disrupted)
+				break;
+			
+			if (n-1 == tillCol) {
+				hasMoreCols = false;
+				//System.out.println("");
+			} else {
+				fromCol = (byte) (tillCol + 1);
+				tillCol = (byte) (tillCol + Math.sqrt(n));
+			}
+		}
+		
+		return disrupted;
+		
+	}
+	
 	private void performSmallerGridCheckTillNow(byte i) {
 		
 		//System.out.println("-> Performing smaller grid check after generating grid possibilities of " + i + " rows at a time");
@@ -187,17 +251,16 @@ public class GridPossibilities {
 			byte tillCol = (byte) (Math.sqrt(n) - 1);
 			while (hasMoreCols) {
 				
-				Set<Byte> possibilities = new HashSet<Byte>();
-				for (byte number = 1; number <= n; number++)
-					possibilities.add(number);
+				//
+				Set<Byte> domain = getMutableDomain();
 				
 				boolean disrupted = false;
 				
 				for (byte row = fromGridRow; row <= tillGridRow; row++) {
 					for (byte col = fromCol; col <= tillCol; col++) {
 						Byte value = gridPossibility[row][col];
-						if (possibilities.contains(value)) {
-							possibilities.remove(value);
+						if (domain.contains(value)) {
+							domain.remove(value);
 						} else {
 							//System.out.println("-> row " + row + " col " + col);
 							setOfIRowToBeDiscarded.add(gridPossibility);
@@ -238,6 +301,10 @@ public class GridPossibilities {
 			System.out.println();
 		}
 		System.out.println();
+	}
+	
+	private Set<Byte> getMutableDomain() {
+		return new HashSet<Byte>(domain);
 	}
 	
 }
